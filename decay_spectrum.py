@@ -6,12 +6,17 @@
 import ROOT
 
 # Units in GeV
-mass = 200
+mass = 300
 
 energy = 500
 
 # Units in ns
-taus = [0.01,0.1,1,10,100]
+taus = [0.01,0.02,0.03, 0.04, 0.05,0.06, 0.07,0.08,0.09,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3,4,5,6,7,8,9,10,20,30,40, 50,60,70,80,90, 100]
+#taus = [0.01, 0.1, 1, 10, 100]
+taus_display = ["0.01","0.1","1","10","100"]
+
+# If you want c tau beta gamma info
+verbose = False
 
 # Store graph formatting
 graph_formatting = {
@@ -31,15 +36,22 @@ graph_formatting = {
                   "yrange": (0,1),
                   "xlabel": "Decay displacement [m]",
                   "ylabel": "Relative decay probability"},
+  "system_distribution" : {"xrange":(0.005,100),
+                  "yrange" : (0,1),
+                  "xlabel" : "Lifetime [ns]",
+                  "ylabel" : "Fraction of decays in subdetector"
+
+  }
 }
 
 # Everything in m
-detector_info = {
-  "Inner detector" : {"abs_z1" : 0.3315, 
+from collections import OrderedDict
+detector_info = OrderedDict([
+  ("Inner detector" , {"abs_z1" : 0.3315, 
                       "abs_z2" : 2.72,
                       "r1" : 0.033,
-                      "r2" : 1.066  },
-  "Calorimeters" : {
+                      "r2" : 1.066  }),
+  ("Calorimeters" , {
                     # Tile cal: r = 2.3 to 3.9
                     # total z length: 12m, so abs_z1 = abs_z2 = 6 m
                     # LAr cal: r = 1.15 to 2.25
@@ -48,14 +60,23 @@ detector_info = {
                     "abs_z1" : 6.0,
                     'abs_z2' : 6.0,
                     "r1" : 1.15,
-                    "r2" : 3.9 },
-  "Muon spectrometer" : {
+                    "r2" : 3.9 }),
+  ("Muon spectrometer" , {
                     "abs_z1" : 6.,
                     "abs_z2" : 13.,
                     "r1" : 5.,
                     "r2": 10.,
-  }
-}
+  })
+])
+
+# Create colors
+#color1 = ROOT.TColor().GetColor("#5fa55a")
+color1 = ROOT.TColor().GetColor("#4C8448")
+color2 = ROOT.TColor().GetColor("#01b4bc")
+color3 = ROOT.TColor().GetColor("#f6d51f")
+color4 = ROOT.TColor().GetColor("#fa8925")
+#color5 = ROOT.TColor().GetColor("#fa5457")
+color5 = ROOT.TColor().GetColor("#E14B4E")
 
 def make_graph(xvals, yvals) :
 
@@ -68,7 +89,7 @@ def make_graph(xvals, yvals) :
 import AtlasStyle
 AtlasStyle.SetAtlasStyle()
 
-def plot_graphs(graphs,legend_list,graphname,tag="") :
+def plot_graphs(graphs,legend_list,graphname,extraline="",tag="",legend_low=True) :
 
   # Make a canvas to put the plot on.
   # Format it to have log x axis.
@@ -84,9 +105,16 @@ def plot_graphs(graphs,legend_list,graphname,tag="") :
   # Decide what colours to use.
   # These ones look decent, but obviously use
   # whatever you like best.
-  goodColours = [ROOT.kRed-7,ROOT.kAzure+1,ROOT.kTeal+1,ROOT.kOrange-4,ROOT.kViolet-5]
+  #goodColours = [ROOT.kRed-7,ROOT.kAzure+1,ROOT.kTeal+1,ROOT.kOrange-4,ROOT.kViolet-5]
+  goodColours = [color1,color2,color3,color4,color5]
+  if len(graphs) < 4 :
+    #goodColours = [ROOT.kRed-7,ROOT.kAzure+1,ROOT.kOrange-4]
+    goodColours = [color2,color3,color5]
 
-  legend = ROOT.TLegend(0.2,0.2,0.52,0.4)
+  leg_height = 0.04*len(graphs)
+  leg_top = 0.2+leg_height if legend_low else 0.8
+  leg_bottom = 0.2 if legend_low else 0.8-leg_height
+  legend = ROOT.TLegend(0.2,leg_bottom,0.52,leg_top)
   # Make the text a nice fond, and big enough
   legend.SetTextFont(42)
   legend.SetTextSize(0.04)
@@ -106,7 +134,7 @@ def plot_graphs(graphs,legend_list,graphname,tag="") :
       these = (item,)
     for j,graph in enumerate(these) :
       graph.SetLineColor(goodColours[i])
-      graph.SetLineWidth(3)
+      graph.SetLineWidth(4)
       graph.GetXaxis().SetLimits(properties["xrange"][0],properties["xrange"][1])
       graph.GetYaxis().SetRangeUser(properties["yrange"][0],properties["yrange"][1])    
       if i > 0 or j > 0 :
@@ -127,8 +155,11 @@ def plot_graphs(graphs,legend_list,graphname,tag="") :
   myLatex.SetNDC()
   myLatex.SetTextSize(0.04)
   myLatex.SetTextFont(42)
-  myLatex.DrawLatex(0.2,0.46,"M: {0} GeV".format(mass))
-  myLatex.DrawLatex(0.2,0.42,"E: {0} GeV".format(energy))
+  if extraline :
+    myLatex.DrawLatex(0.2,leg_top+0.02,extraline)
+    leg_top = leg_top+0.04
+  myLatex.DrawLatex(0.2,leg_top+0.06,"M: {0} GeV".format(mass))
+  myLatex.DrawLatex(0.2,leg_top+0.02,"E: {0} GeV".format(energy))
 
   # Update the canvas
   c.Update()
@@ -151,6 +182,8 @@ import scipy.special as sc
 
 graphs = {}
 detector_data = {}
+detector_data["total"] = {}
+detector_data["total_insystem"] = {}
 
 for tau in taus :
 
@@ -160,7 +193,7 @@ for tau in taus :
 
   # tau is in ns; convert to seconds
   tau_s = tau * constants.nano
-  print("Tau in seconds:",tau_s)
+  if verbose : print("Tau in seconds:",tau_s)
 
   ## Mean lifetime tau:
   # N(t) = N(0) exp(-t/tau)
@@ -173,10 +206,11 @@ for tau in taus :
   gamma = float(energy)/float(mass)
   beta = np.sqrt(1.-(1./gamma)**2)
   xMean = beta * gamma * constants.c * tau_s
-  print("Velocity is",beta,"of c.")
-  print("Beta-gamma is",beta*gamma)
-  print("ctau is",constants.c * tau_s,"m")
-  print("xMean is", xMean,"m")
+  if verbose :
+    print("Velocity is",beta,"of c.")
+    print("Beta-gamma is",beta*gamma)
+    print("ctau is",constants.c * tau_s,"m")
+    print("xMean is", xMean,"m")
 
   # For defining graphs
   xvals_distance = np.logspace(-6,2,200,endpoint=True)
@@ -232,33 +266,45 @@ for tau in taus :
   N_transverse_total = N_subdetector(5*tau,5*tau,0,5*tau)
 
   test = N_subdetector(1,1,1,2)
-  print "Frac in subdector from -1 to 1 and 1 to 2:",test/N_transverse_total
-  print "Total:",N_transverse_total
-  print "N in here:",test
-
-  print "Test limit. Interpolate from z=1 at r=1 to z=3 at r=2, evaluate for r=1.5"
-  print "z_lims are",lim_z(1.5,1,3,1,2)
 
   # Calculation per subdetector
   for detector in detector_info.keys() :
 
     dimensions = detector_info[detector]
-    #n_particles = N_subdetector()
-
-
+    n_particles = N_subdetector(dimensions["abs_z1"],dimensions["abs_z2"],dimensions["r1"],dimensions["r2"])
+    if not detector in detector_data.keys() :
+      detector_data[detector] = {}
+    detector_data[detector][tau_string] = n_particles
+    
+  detector_data["total"][tau_string] = N_transverse_total
+  vals_to_add = [detector_data[i][tau_string] for i in detector_data.keys() if not "total" in i]
+  detector_data["total_insystem"][tau_string] = sum(vals_to_add)
 
 # Now make plots.
-legend_list = ["#tau = {0} ns".format(i) for i in sorted(graphs.keys())]
+legend_list = ["#tau = {0}".format(i) for i in sorted(graphs.keys()) if i in taus_display]
 for graph_name in graphs["1"].keys() :
 
-  graph_list = [graphs[i][graph_name] for i in sorted(graphs.keys())]
+  graph_list = [graphs[i][graph_name] for i in sorted(graphs.keys()) if i in taus_display]
   plot_graphs(graph_list,legend_list,graph_name)
 
 # Comparison graph.
-graphs_total = [graphs[i]["total_dist"] for i in sorted(graphs.keys())]
-graphs_transverse = [graphs[i]["transverse_dist"] for i in sorted(graphs.keys())]
-plot_graphs(zip(graphs_total,graphs_transverse),legend_list,"dist",tag="compare")
+graphs_total = [graphs[i]["total_dist"] for i in sorted(graphs.keys()) if i in taus_display]
+graphs_transverse = [graphs[i]["transverse_dist"] for i in sorted(graphs.keys()) if i in taus_display]
+plot_graphs(zip(graphs_total,graphs_transverse),legend_list,"dist",extraline="Lifetime [ns]",tag="compare")
 
+# Make and plot graphs of acceptance versus lifetime in detector parts
+graphs_systems = []
+legend_list = []
+for detector in detector_info.keys() :
+  #print "Checking detector",detector
+  use_keys = detector_data[detector].keys()
+  use_keys.sort(key=lambda x: float(x))
+  xvals = [eval(i) for i in use_keys]
+  yvals = [detector_data[detector][i]/detector_data["total_insystem"][i] for i in use_keys]
+  graph = make_graph(xvals,yvals)
+  graphs_systems.append(graph)
+  legend_list.append(detector)
+plot_graphs(graphs_systems,legend_list,"system_distribution",legend_low = False)
 
 
 # Matplotlib example
