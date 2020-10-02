@@ -6,9 +6,11 @@
 import ROOT
 
 # Units in GeV
-mass = 300
+mass = 50
 
-energy = 500
+energy = 800
+
+plottag = "m{0}_e{1}".format(mass,energy)
 
 # Units in ns
 taus = [0.01,0.02,0.03, 0.04, 0.05,0.06, 0.07,0.08,0.09,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3,4,5,6,7,8,9,10,20,30,40, 50,60,70,80,90, 100]
@@ -167,11 +169,11 @@ def plot_graphs(graphs,legend_list,graphname,extraline="",tag="",legend_low=True
   # Save the output
   savename = graphname
   if tag : savename = savename + "_"+tag
-  c.SaveAs(savename+".eps")
+  c.SaveAs("plots/"+savename+".eps")
 
   # Save another without the log
   c.SetLogx(False)
-  c.SaveAs(savename+"_linear.eps")
+  c.SaveAs("plots/"+savename+"_linear.eps")
 
 # And start
 import numpy as np
@@ -285,37 +287,25 @@ legend_list = ["#tau = {0}".format(i) for i in sorted(graphs.keys()) if i in tau
 for graph_name in graphs["1"].keys() :
 
   graph_list = [graphs[i][graph_name] for i in sorted(graphs.keys()) if i in taus_display]
-  plot_graphs(graph_list,legend_list,graph_name)
+  plot_graphs(graph_list,legend_list,graph_name,tag=plottag)
 
 # Comparison graph.
 graphs_total = [graphs[i]["total_dist"] for i in sorted(graphs.keys()) if i in taus_display]
 graphs_transverse = [graphs[i]["transverse_dist"] for i in sorted(graphs.keys()) if i in taus_display]
-plot_graphs(zip(graphs_total,graphs_transverse),legend_list,"dist",extraline="Lifetime [ns]",tag="compare")
+plot_graphs(list(zip(graphs_total,graphs_transverse)),legend_list,"dist",extraline="Lifetime [ns]",tag="compare_"+plottag)
 
 # Make and plot graphs of acceptance versus lifetime in detector parts
 graphs_systems = []
 legend_list = []
 for detector in detector_info.keys() :
   #print "Checking detector",detector
-  use_keys = detector_data[detector].keys()
+  use_keys = list(detector_data[detector].keys())
   use_keys.sort(key=lambda x: float(x))
   xvals = [eval(i) for i in use_keys]
   yvals = [detector_data[detector][i]/detector_data["total_insystem"][i] for i in use_keys]
   graph = make_graph(xvals,yvals)
   graphs_systems.append(graph)
   legend_list.append(detector)
-plot_graphs(graphs_systems,legend_list,"system_distribution",legend_low = False)
-
-
-# Matplotlib example
-## Plot 1: Number of particles versus total decay distance
-#xvals = np.logspace(-6,2,200,endpoint=True)
-#yvals_cumulative = [N_cumulative(x) for x in xvals]
-#plt.figure()
-#plt.plot(xvals, N(xvals), 'b', xvals, yvals_cumulative, 'r')
-#plt.xlim(6e-6, 200)
-#plt.xscale('log')
-#plt.show()
-
+plot_graphs(graphs_systems,legend_list,"system_distribution",legend_low = False,tag=plottag)
 
 
